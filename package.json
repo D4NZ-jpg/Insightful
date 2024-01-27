@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
+	"name": "Insightful",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "Transform your notes into a network of knowledge. Quickly uncover and explore the hidden connections in your writing with ease.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
