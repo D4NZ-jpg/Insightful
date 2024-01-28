@@ -16,7 +16,7 @@ interface APIResponse {
 
 interface EmbeddingRequest {
 	model: string;
-	input: string;
+	input: string | Array<string>;
 }
 
 export default class APIWrapper {
@@ -53,7 +53,7 @@ export default class APIWrapper {
 		}
 	}
 
-	async getEmbeddings(model: string, inputText: string): Promise<APIResponse> {
+	async getEmbeddings(model: string, inputText: string | Array<string>): Promise<APIResponse> {
 		const data: EmbeddingRequest = {
 			model: model,
 			input: inputText

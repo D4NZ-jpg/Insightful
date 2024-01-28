@@ -1,4 +1,6 @@
 import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import API from './api';
+import { VectorDatabase } from './database';
 
 interface InsighfulSettings {
 	host: string;
@@ -12,17 +14,28 @@ const DEFAULT_SETTINGS: InsighfulSettings = {
 	embedding_model: 'text-embedding-3-small'
 }
 
+
 export default class Insightful extends Plugin {
 	settings: InsighfulSettings;
+	db: VectorDatabase; // Vector database
 
 	async onload() {
 		await this.loadSettings();
 
+		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SettingTab(this.app, this));
+
+		const api = new API(this.settings.api_key, this.settings.host);
+
+		if (!this.app.workspace.layoutReady)
+			this.app.workspace.onLayoutReady(async () => this.db = new VectorDatabase(this.app.vault, api, this.settings.embedding_model));
+		else
+			this.db = new VectorDatabase(this.app.vault, api, this.settings.embedding_model);
+
 	}
 
 	onunload() {
-
+		this.db.writeDatabase();
 	}
 
 	async loadSettings() {
