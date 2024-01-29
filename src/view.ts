@@ -1,5 +1,6 @@
 import { ItemView, WorkspaceLeaf, App } from "obsidian";
-import { VectorDatabase } from "./database";
+import { VectorDatabase, QueryResult } from "./database";
+
 
 export const VIEW_TYPE_INSIGHT = "insight-view";
 
@@ -34,7 +35,7 @@ export class InsightView extends ItemView {
 
 
 			const content = await this.app.vault.read(file);
-			const res = await VectorDatabase.query(content, 10);
+			const res = await VectorDatabase.query(content, 10, file.path);
 
 			this.displayResults(res);
 		});
@@ -49,14 +50,28 @@ export class InsightView extends ItemView {
 		container.appendChild(this.resultsContainer);
 	}
 
-	displayResults(results: Array<{ id: string, body: string, score: number }>) {
+	displayResults(results: Array<QueryResult>) {
 		this.resultsContainer.empty();
 
 		results.forEach(result => {
-			const resultEl = document.createElement('div');
-			resultEl.textContent = `${Math.round(result.score * 100)}% | ${result.body}`
-			this.resultsContainer.appendChild(resultEl);
-			this.resultsContainer.appendChild(document.createElement('br'))
+			// Create the card container
+			const card = document.createElement('div');
+			card.addClass('card');
+
+			// Create the data div and set its content
+			const dataDiv = document.createElement('div');
+			dataDiv.addClass('data');
+			dataDiv.textContent = `${Math.round(result.score * 100)}% | ${result.path}`;
+
+			const quoteDiv = document.createElement('div');
+			quoteDiv.addClass('quote');
+			quoteDiv.textContent = result.body;
+
+			// Append the data and quote divs to the card
+			card.appendChild(dataDiv);
+			card.appendChild(quoteDiv);
+
+			this.resultsContainer.appendChild(card);
 		});
 	}
 

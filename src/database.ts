@@ -15,10 +15,16 @@ interface Entry {
 	update: number;
 }
 
-
 interface Database {
-	embeddings: Map<string, { embed: Array<number>, content: string }>;
+	embeddings: Map<string, { embed: Array<number>, content: string, path: string }>;
 	metadata: Map<string, Array<Entry>>;
+}
+
+export interface QueryResult {
+	id: string;
+	body: string;
+	path: string;
+	score: number;
 }
 
 export class VectorDatabase { // FIX: Really simple database, not efficent, slow :c
@@ -64,7 +70,8 @@ export class VectorDatabase { // FIX: Really simple database, not efficent, slow
 				Array.from(parsed.embeddings.values()).every(val =>
 					Array.isArray(val.embed) &&
 					val.embed.every(e => typeof e === 'number') &&
-					typeof val.content === 'string');
+					typeof val.content === 'string' &&
+					typeof val.path === 'string');
 
 			const hasMetadata = parsed.metadata instanceof Map &&
 				Array.from(parsed.metadata.values()).every(arr =>
@@ -85,7 +92,7 @@ export class VectorDatabase { // FIX: Really simple database, not efficent, slow
 		}
 
 		return {
-			embeddings: new Map<string, { embed: [], content: "" }>(), metadata: new Map<string, Array<Entry>>()
+			embeddings: new Map<string, { embed: [], content: string, path: string }>(), metadata: new Map<string, Array<Entry>>()
 		};
 	}
 
@@ -116,6 +123,7 @@ export class VectorDatabase { // FIX: Really simple database, not efficent, slow
 			VectorDatabase.data.embeddings.set(id, {
 				embed: res[i].embedding,
 				content: content[i],
+				path: metadata[i].file,
 			});
 
 			if (VectorDatabase.data.metadata.get(metadata[i].file) === undefined)
@@ -130,14 +138,17 @@ export class VectorDatabase { // FIX: Really simple database, not efficent, slow
 		this.writeDatabase();
 	}
 
-	static async query(content: string, nearestN: number) {
+	static async query(content: string, nearestN: number, exclude: string) {
 		const query = (await this.api.getEmbeddings(this.model, content)).data[0].embedding;
-		const results: Array<{ id: string, body: string, score: number }> = [];
+		const results: Array<QueryResult> = [];
 
 		for (const [id, entry] of VectorDatabase.data.embeddings) {
+			if (exclude && entry.path == exclude) continue;
+
 			const score = this.cosinesim(query, entry.embed);
 			const body = entry.content;
-			results.push({ id, body, score });
+			const path = entry.path;
+			results.push({ id, body, path, score });
 		}
 
 		results.sort((a, b) => b.score - a.score);
