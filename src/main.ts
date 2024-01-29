@@ -1,6 +1,7 @@
-import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, WorkspaceLeaf } from 'obsidian';
 import API from './api';
 import { VectorDatabase } from './database';
+import { InsightView, VIEW_TYPE_INSIGHT } from './view';
 
 interface InsighfulSettings {
 	host: string;
@@ -25,13 +26,34 @@ export default class Insightful extends Plugin {
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SettingTab(this.app, this));
 
+		// API
 		const api = new API(this.settings.api_key, this.settings.host);
 
+		// Load database when ready
 		if (!this.app.workspace.layoutReady)
 			this.app.workspace.onLayoutReady(async () => this.db = new VectorDatabase(this.app.vault, api, this.settings.embedding_model));
 		else
 			this.db = new VectorDatabase(this.app.vault, api, this.settings.embedding_model);
 
+		// Register view
+		this.registerView(
+			VIEW_TYPE_INSIGHT,
+			(leaf) => new InsightView(leaf, this.app)
+		);
+
+		// Commands
+
+		this.addCommand({ // Open view
+			id: "open-insight-view",
+			name: "Open Insights",
+			callback: () => this.activateView(),
+		})
+
+		this.addCommand({ // Update database
+			id: "update-database",
+			name: "Update insights",
+			callback: () => this.db.updateAll()
+		});
 	}
 
 	onunload() {
@@ -44,6 +66,21 @@ export default class Insightful extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+	async activateView() {
+		const { workspace } = this.app;
+
+		let leaf: WorkspaceLeaf | null = null;
+		const leaves = workspace.getLeavesOfType(VIEW_TYPE_INSIGHT);
+
+		if (leaves.length > 0)
+			leaf = leaves[0];
+		else {
+			leaf = workspace.getRightLeaf(false);
+			await leaf.setViewState({ type: VIEW_TYPE_INSIGHT, active: true });
+		}
+
+		workspace.revealLeaf(leaf);
 	}
 }
 

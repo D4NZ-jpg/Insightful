@@ -21,26 +21,28 @@ interface Database {
 }
 
 export class VectorDatabase { // FIX: Really simple database, not efficent, slow :c
-	data: Database
+	static data: Database
+	static model: string;
+	static vault: Vault;
+	static api: API;
 	path: string;
-	vault: Vault;
-	api: API;
-	model: string;
+
+
 
 	constructor(plugin: Vault, api: API, model: string) {
-		this.vault = plugin;
-		this.api = api;
-		this.model = model;
+		VectorDatabase.vault = plugin;
+		VectorDatabase.api = api;
+		VectorDatabase.model = model;
 
 		this.loadDatabase().then((res) => {
-			this.data = res;
+			VectorDatabase.data = res;
 		});
 
 	}
 
 	async loadDatabase(): Promise<Database> {
 		try {
-			const file = await this.vault.adapter.read(".embeds")
+			const file = await VectorDatabase.vault.adapter.read(".embeds")
 			const buffer = Buffer.from(file, 'base64');
 			const decompressed = await gunzip(buffer);
 
@@ -85,7 +87,7 @@ export class VectorDatabase { // FIX: Really simple database, not efficent, slow
 	}
 
 	async writeDatabase() {
-		const jsonString = JSON.stringify(this.data, (_, value) => {
+		const jsonString = JSON.stringify(VectorDatabase.data, (_, value) => {
 			if (value instanceof Map) {
 				return {
 					dataType: 'Map',
@@ -98,25 +100,25 @@ export class VectorDatabase { // FIX: Really simple database, not efficent, slow
 
 		const compressed = await gzip(jsonString);
 
-		await this.vault.adapter.write(".embeds", compressed.toString('base64'));
+		await VectorDatabase.vault.adapter.write(".embeds", compressed.toString('base64'));
 
 	}
 
 
 	async add(content: Array<string>, metadata: Array<{ file: string, update: number }>) {
-		const res = (await this.api.getEmbeddings(this.model, content)).data;
+		const res = (await VectorDatabase.api.getEmbeddings(VectorDatabase.model, content)).data;
 
 		for (let i = 0, len = content.length; i < len; i++) {
 			const id = uuidv4();
-			this.data.embeddings.set(id, {
+			VectorDatabase.data.embeddings.set(id, {
 				embed: res[i].embedding,
 				content: content[i],
 			});
 
-			if (this.data.metadata.get(metadata[i].file) === undefined)
-				this.data.metadata.set(metadata[i].file, []);
+			if (VectorDatabase.data.metadata.get(metadata[i].file) === undefined)
+				VectorDatabase.data.metadata.set(metadata[i].file, []);
 
-			this.data.metadata.get(metadata[i].file)?.push({
+			VectorDatabase.data.metadata.get(metadata[i].file)?.push({
 				embedId: id,
 				file: metadata[i].file,
 				update: metadata[i].update,
@@ -125,11 +127,11 @@ export class VectorDatabase { // FIX: Really simple database, not efficent, slow
 		this.writeDatabase();
 	}
 
-	async query(content: string, nearestN: number) {
+	static async query(content: string, nearestN: number) {
 		const query = (await this.api.getEmbeddings(this.model, content)).data[0].embedding;
 		const results: Array<{ id: string, body: string, score: number }> = [];
 
-		for (const [id, entry] of this.data.embeddings) {
+		for (const [id, entry] of VectorDatabase.data.embeddings) {
 			const score = this.cosinesim(query, entry.embed);
 			const body = entry.content;
 			results.push({ id, body, score });
@@ -140,14 +142,39 @@ export class VectorDatabase { // FIX: Really simple database, not efficent, slow
 	}
 
 	async removeFile(file: string) {
-		const entry = this.data.metadata.get(file);
-		entry?.forEach((x) => this.data.embeddings.delete(x.embedId))
+		const entry = VectorDatabase.data.metadata.get(file);
+		entry?.forEach((x) => VectorDatabase.data.embeddings.delete(x.embedId))
 
-		this.data.metadata.delete(file);
+		VectorDatabase.data.metadata.delete(file);
 		this.writeDatabase();
 	}
 
-	cosinesim(A: Array<number>, B: Array<number>) {
+	async updateAll() {
+		const files = VectorDatabase.vault.getMarkdownFiles();
+		const strings: Array<string> = [];
+		const metadata: Array<{ file: string, update: number }> = [];
+
+		for (const idx in files) {
+			const file = files[idx];
+
+			const res = VectorDatabase.data.metadata.get(file.path);
+			if (res) {
+				if (res[0].update == file.stat.mtime) continue;
+				else this.removeFile(file.path);
+			}
+
+			const content = await VectorDatabase.vault.read(file);
+			strings.push(content);
+			metadata.push({
+				file: file.path,
+				update: file.stat.mtime,
+			});
+		}
+
+		this.add(strings, metadata);
+	}
+
+	static cosinesim(A: Array<number>, B: Array<number>) {
 		let dotproduct = 0;
 		let mA = 0, mB = 0;
 
