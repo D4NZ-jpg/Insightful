@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import * as zlib from 'zlib';
 import { promisify } from 'util';
 import API from './api';
+import { splitMD } from './utils';
 
 const gzip = promisify(zlib.gzip);
 const gunzip = promisify(zlib.gunzip);
@@ -25,14 +26,16 @@ export class VectorDatabase { // FIX: Really simple database, not efficent, slow
 	static model: string;
 	static vault: Vault;
 	static api: API;
+	static maxLen: number;
 	path: string;
 
 
 
-	constructor(plugin: Vault, api: API, model: string) {
+	constructor(plugin: Vault, api: API, model: string, maxLen: number) {
 		VectorDatabase.vault = plugin;
 		VectorDatabase.api = api;
 		VectorDatabase.model = model;
+		VectorDatabase.maxLen = maxLen;
 
 		this.loadDatabase().then((res) => {
 			VectorDatabase.data = res;
@@ -164,11 +167,14 @@ export class VectorDatabase { // FIX: Really simple database, not efficent, slow
 			}
 
 			const content = await VectorDatabase.vault.read(file);
-			strings.push(content);
-			metadata.push({
-				file: file.path,
-				update: file.stat.mtime,
-			});
+			const splits = splitMD(content, VectorDatabase.maxLen);
+			strings.push(...splits);
+
+			for (let i = 0; i < splits.length; i += 1)
+				metadata.push({
+					file: file.path,
+					update: file.stat.mtime,
+				});
 		}
 
 		this.add(strings, metadata);

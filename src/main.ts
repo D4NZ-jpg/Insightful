@@ -1,18 +1,20 @@
 import { App, Plugin, PluginSettingTab, Setting, WorkspaceLeaf } from 'obsidian';
 import API from './api';
 import { VectorDatabase } from './database';
-import { InsightView, VIEW_TYPE_INSIGHT } from './view';
+import { InsightView, VIEW_TYPE_INSIGHT } from './view'
 
 interface InsighfulSettings {
 	host: string;
 	api_key: string;
 	embedding_model: string;
+	max_length: number;
 }
 
 const DEFAULT_SETTINGS: InsighfulSettings = {
 	host: 'https://api.openai.com',
 	api_key: '',
-	embedding_model: 'text-embedding-3-small'
+	embedding_model: 'text-embedding-3-small',
+	max_length: 256
 }
 
 
@@ -31,9 +33,9 @@ export default class Insightful extends Plugin {
 
 		// Load database when ready
 		if (!this.app.workspace.layoutReady)
-			this.app.workspace.onLayoutReady(async () => this.db = new VectorDatabase(this.app.vault, api, this.settings.embedding_model));
+			this.app.workspace.onLayoutReady(async () => this.db = new VectorDatabase(this.app.vault, api, this.settings.embedding_model, this.settings.max_length));
 		else
-			this.db = new VectorDatabase(this.app.vault, api, this.settings.embedding_model);
+			this.db = new VectorDatabase(this.app.vault, api, this.settings.embedding_model, this.settings.max_length);
 
 		// Register view
 		this.registerView(
@@ -42,12 +44,11 @@ export default class Insightful extends Plugin {
 		);
 
 		// Commands
-
 		this.addCommand({ // Open view
 			id: "open-insight-view",
 			name: "Open Insights",
 			callback: () => this.activateView(),
-		})
+		});
 
 		this.addCommand({ // Update database
 			id: "update-database",
