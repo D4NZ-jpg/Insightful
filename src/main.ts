@@ -53,12 +53,12 @@ export default class Insightful extends Plugin {
 		this.addCommand({ // Update database
 			id: "update-database",
 			name: "Update insights",
-			callback: () => this.db.updateAll()
+			callback: () => VectorDatabase.updateAll()
 		});
 	}
 
 	onunload() {
-		this.db.writeDatabase();
+		VectorDatabase.writeDatabase();
 	}
 
 	async loadSettings() {

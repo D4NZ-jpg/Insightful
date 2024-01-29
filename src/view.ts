@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, App } from "obsidian";
+import { ItemView, WorkspaceLeaf, App, TFile } from "obsidian";
 import { VectorDatabase, QueryResult } from "./database";
 
 
@@ -30,6 +30,8 @@ export class InsightView extends ItemView {
 		const searchButton = document.createElement('button');
 		searchButton.textContent = 'Search';
 		searchButton.addEventListener('click', async () => {
+			await VectorDatabase.updateAll();
+
 			const file = this.app.workspace.getActiveFile();
 			if (!file) return;
 
@@ -70,6 +72,13 @@ export class InsightView extends ItemView {
 			// Append the data and quote divs to the card
 			card.appendChild(dataDiv);
 			card.appendChild(quoteDiv);
+
+			card.addEventListener('click', async () => {
+				const leaf = this.app.workspace.getLeaf('tab');
+				const file = this.app.vault.getAbstractFileByPath(result.path);
+				if (file instanceof TFile)
+					leaf.openFile(file);
+			});
 
 			this.resultsContainer.appendChild(card);
 		});

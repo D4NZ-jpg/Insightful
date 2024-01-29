@@ -96,12 +96,12 @@ export class VectorDatabase { // FIX: Really simple database, not efficent, slow
 		};
 	}
 
-	async writeDatabase() {
+	static async writeDatabase() {
 		const jsonString = JSON.stringify(VectorDatabase.data, (_, value) => {
 			if (value instanceof Map) {
 				return {
 					dataType: 'Map',
-					value: Array.from(value.entries()), // or with spread: value: [...value]
+					value: Array.from(value.entries()),
 				};
 			} else {
 				return value;
@@ -115,7 +115,7 @@ export class VectorDatabase { // FIX: Really simple database, not efficent, slow
 	}
 
 
-	async add(content: Array<string>, metadata: Array<{ file: string, update: number }>) {
+	static async add(content: Array<string>, metadata: Array<{ file: string, update: number }>) {
 		const res = (await VectorDatabase.api.getEmbeddings(VectorDatabase.model, content)).data;
 
 		for (let i = 0, len = content.length; i < len; i++) {
@@ -135,7 +135,7 @@ export class VectorDatabase { // FIX: Really simple database, not efficent, slow
 				update: metadata[i].update,
 			});
 		}
-		this.writeDatabase();
+		VectorDatabase.writeDatabase();
 	}
 
 	static async query(content: string, nearestN: number, exclude: string) {
@@ -155,15 +155,15 @@ export class VectorDatabase { // FIX: Really simple database, not efficent, slow
 		return results.slice(0, nearestN);
 	}
 
-	async removeFile(file: string) {
+	static async removeFile(file: string) {
 		const entry = VectorDatabase.data.metadata.get(file);
 		entry?.forEach((x) => VectorDatabase.data.embeddings.delete(x.embedId))
 
 		VectorDatabase.data.metadata.delete(file);
-		this.writeDatabase();
+		VectorDatabase.writeDatabase();
 	}
 
-	async updateAll() {
+	static async updateAll() {
 		const files = VectorDatabase.vault.getMarkdownFiles();
 		const strings: Array<string> = [];
 		const metadata: Array<{ file: string, update: number }> = [];
@@ -174,10 +174,10 @@ export class VectorDatabase { // FIX: Really simple database, not efficent, slow
 			const res = VectorDatabase.data.metadata.get(file.path);
 			if (res) {
 				if (res[0].update == file.stat.mtime) continue;
-				else this.removeFile(file.path);
+				else VectorDatabase.removeFile(file.path);
 			}
 
-			const content = await VectorDatabase.vault.read(file);
+			const content = await VectorDatabase.vault.cachedRead(file);
 			const splits = splitMD(content, VectorDatabase.maxLen);
 			strings.push(...splits);
 
@@ -188,7 +188,7 @@ export class VectorDatabase { // FIX: Really simple database, not efficent, slow
 				});
 		}
 
-		this.add(strings, metadata);
+		VectorDatabase.add(strings, metadata);
 	}
 
 	static cosinesim(A: Array<number>, B: Array<number>) {
